@@ -27,9 +27,6 @@ class Stream
     // These must be blocking calls
     virtual void copy() = 0;
     virtual void mul() = 0;
-    virtual void add() = 0;
-    virtual void triad() = 0;
-    virtual T dot() = 0;
 
     // Copy memory between host and device
     virtual void init_arrays(T initA, T initB, T initC) = 0;

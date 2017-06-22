@@ -19,34 +19,17 @@
 
 #include "Stream.h"
 
-#if defined(CUDA)
-#include "CUDAStream.h"
-#elif defined(HIP)
+#if defined(HIP)
 #include "HIPStream.h"
 #elif defined(HC)
 #include "HCStream.h"
-#elif defined(OCL)
-#include "OCLStream.h"
-#elif defined(USE_RAJA)
-#include "RAJAStream.hpp"
-#elif defined(KOKKOS)
-#include "KOKKOSStream.hpp"
-#elif defined(ACC)
-#include "ACCStream.h"
-#elif defined(SYCL)
-#include "SYCLStream.h"
-#elif defined(OMP)
-#include "OMPStream.h"
 #endif
-
 // Default size of 2^25
 unsigned int ARRAY_SIZE = 33554432;
 unsigned int num_times = 100;
 unsigned int deviceIndex = 0;
 bool use_float = false;
 
-template <typename T>
-void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>& b, std::vector<T>& c, T& sum);
 
 template <typename T>
 void run();
@@ -99,48 +82,18 @@ void run()
 
   Stream<T> *stream;
 
-#if defined(CUDA)
-  // Use the CUDA implementation
-  stream = new CUDAStream<T>(ARRAY_SIZE, deviceIndex);
-
-#elif defined(HIP)
+#if defined(HIP)
   // Use the HIP implementation
   stream = new HIPStream<T>(ARRAY_SIZE, deviceIndex);
 
 #elif defined(HC)
   // Use the HC implementation
   stream = new HCStream<T>(ARRAY_SIZE, deviceIndex);
-
-#elif defined(OCL)
-  // Use the OpenCL implementation
-  stream = new OCLStream<T>(ARRAY_SIZE, deviceIndex);
-
-#elif defined(USE_RAJA)
-  // Use the RAJA implementation
-  stream = new RAJAStream<T>(ARRAY_SIZE, deviceIndex);
-
-#elif defined(KOKKOS)
-  // Use the Kokkos implementation
-  stream = new KOKKOSStream<T>(ARRAY_SIZE, deviceIndex);
-
-#elif defined(ACC)
-  // Use the OpenACC implementation
-  stream = new ACCStream<T>(ARRAY_SIZE, a.data(), b.data(), c.data(), deviceIndex);
-
-#elif defined(SYCL)
-  // Use the SYCL implementation
-  stream = new SYCLStream<T>(ARRAY_SIZE, deviceIndex);
-
-#elif defined(OMP)
-  // Use the OpenMP implementation
-  stream = new OMPStream<T>(ARRAY_SIZE, a.data(), b.data(), c.data(), deviceIndex);
-
 #endif
-
   stream->init_arrays(startA, startB, startC);
 
   // List of times
-  std::vector<std::vector<double>> timings(5);
+  std::vector<std::vector<double>> timings(2);
 
   // Declare timers
   std::chrono::high_resolution_clock::time_point t1, t2;
@@ -160,29 +113,10 @@ void run()
     t2 = std::chrono::high_resolution_clock::now();
     timings[1].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
 
-    // Execute Add
-    t1 = std::chrono::high_resolution_clock::now();
-    stream->add();
-    t2 = std::chrono::high_resolution_clock::now();
-    timings[2].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
-
-    // Execute Triad
-    t1 = std::chrono::high_resolution_clock::now();
-    stream->triad();
-    t2 = std::chrono::high_resolution_clock::now();
-    timings[3].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
-
-    // Execute Dot
-    t1 = std::chrono::high_resolution_clock::now();
-    sum = stream->dot();
-    t2 = std::chrono::high_resolution_clock::now();
-    timings[4].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
-
   }
 
   // Check solutions
   stream->read_arrays(a, b, c);
-  check_solution<T>(num_times, a, b, c, sum);
 
   // Display timing results
   std::cout
@@ -194,16 +128,13 @@ void run()
 
   std::cout << std::fixed;
 
-  std::string labels[5] = {"Copy", "Mul", "Add", "Triad", "Dot"};
-  size_t sizes[5] = {
+  std::string labels[2] = {"Copy", "Mul"};
+  size_t sizes[2] = {
     2 * sizeof(T) * ARRAY_SIZE,
     2 * sizeof(T) * ARRAY_SIZE,
-    3 * sizeof(T) * ARRAY_SIZE,
-    3 * sizeof(T) * ARRAY_SIZE,
-    2 * sizeof(T) * ARRAY_SIZE
-  };
+   };
 
-  for (int i = 0; i < 5; i++)
+  for (int i = 0; i < 2; i++)
   {
     // Get min/max; ignore the first result
     auto minmax = std::minmax_element(timings[i].begin()+1, timings[i].end());
@@ -223,62 +154,6 @@ void run()
   }
 
   delete stream;
-
-}
-
-template <typename T>
-void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>& b, std::vector<T>& c, T& sum)
-{
-  // Generate correct solution
-  T goldA = startA;
-  T goldB = startB;
-  T goldC = startC;
-  T goldSum = 0.0;
-
-  const T scalar = startScalar;
-
-  for (unsigned int i = 0; i < ntimes; i++)
-  {
-    // Do STREAM!
-    goldC = goldA;
-    goldB = scalar * goldC;
-    goldC = goldA + goldB;
-    goldA = goldB + scalar * goldC;
-  }
-
-  // Do the reduction
-  goldSum = goldA * goldB * ARRAY_SIZE;
-
-  // Calculate the average error
-  double errA = std::accumulate(a.begin(), a.end(), 0.0, [&](double sum, const T val){ return sum + fabs(val - goldA); });
-  errA /= a.size();
-  double errB = std::accumulate(b.begin(), b.end(), 0.0, [&](double sum, const T val){ return sum + fabs(val - goldB); });
-  errB /= b.size();
-  double errC = std::accumulate(c.begin(), c.end(), 0.0, [&](double sum, const T val){ return sum + fabs(val - goldC); });
-  errC /= c.size();
-  double errSum = fabs(sum - goldSum);
-
-  double epsi = std::numeric_limits<T>::epsilon() * 100.0;
-
-  if (errA > epsi)
-    std::cerr
-      << "Validation failed on a[]. Average error " << errA
-      << std::endl;
-  if (errB > epsi)
-    std::cerr
-      << "Validation failed on b[]. Average error " << errB
-      << std::endl;
-  if (errC > epsi)
-    std::cerr
-      << "Validation failed on c[]. Average error " << errC
-      << std::endl;
-  // Check sum to 8 decimal places
-  if (errSum > 1.0E-8)
-    std::cerr
-      << "Validation failed on sum. Error " << errSum
-      << std::endl << std::setprecision(15)
-      << "Sum was " << sum << " but should be " << goldSum
-      << std::endl;
 
 }
 

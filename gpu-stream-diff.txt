@@ -1,0 +1,354 @@
+diff --git a/HCStream.cpp b/HCStream.cpp
+index 1fa620b..136540c 100644
+--- a/HCStream.cpp
++++ b/HCStream.cpp
+@@ -156,114 +156,6 @@ void HCStream<T>::mul()
+   }
+ }
+ 
+-template <class T>
+-void HCStream<T>::add()
+-{
+-
+-
+-  hc::array_view<T,1> view_a(this->d_a);
+-  hc::array_view<T,1> view_b(this->d_b);
+-  hc::array_view<T,1> view_c(this->d_c);
+-
+-  try{
+-    hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
+-                                , [=](hc::index<1> i) [[hc]] {
+-                                  view_c[i] = view_a[i]+view_b[i];
+-								});
+-    future_kernel.wait();
+-  }
+-  catch(std::exception& e){
+-    std::cerr << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::add " << e.what() << std::endl;
+-    throw;
+-  }
+-}
+-
+-template <class T>
+-void HCStream<T>::triad()
+-{
+-
+-  const T scalar = startScalar;
+-  hc::array_view<T,1> view_a(this->d_a);
+-  hc::array_view<T,1> view_b(this->d_b);
+-  hc::array_view<T,1> view_c(this->d_c);
+-
+-  try{
+-    hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
+-                                , [=](hc::index<1> i) [[hc]] {
+-                                  view_a[i] = view_b[i] + scalar*view_c[i];
+-								});
+-    future_kernel.wait();
+-  }
+-  catch(std::exception& e){
+-    std::cerr << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::triad " << e.what() << std::endl;
+-    throw;
+-  }
+-}
+-
+-template <class T>
+-T HCStream<T>::dot()
+-{
+-   //implementation adapted from
+-    //https://ampbook.codeplex.com/SourceControl/latest
+-    // ->Samples/CaseStudies/Reduction
+-    // ->CascadingReduction.h
+-
+-    static constexpr std::size_t n_tiles = 64;
+-
+-    const auto& view_a = this->d_a;
+-    const auto& view_b = this->d_b;
+-
+-    auto ex = view_a.get_extent();
+-    const auto tiled_ex = hc::extent<1>(n_tiles * TBSIZE).tile(TBSIZE);
+-    const auto domain_sz = tiled_ex.size();
+-
+-    hc::array<T, 1> partial(n_tiles);
+-
+-    hc::parallel_for_each(tiled_ex,
+-                          [=,
+-                           &view_a,
+-                           &view_b,
+-                           &partial](const hc::tiled_index<1>& tidx) [[hc]] {
+-
+-                            auto gidx = tidx.global[0];
+-        T r = T{0}; // Assumes reduction op is addition.
+-        while (gidx < view_a.get_extent().size()) {
+-            r += view_a[gidx] * view_b[gidx];
+-            gidx += domain_sz;
+-        }
+-
+-        tile_static T tileData[TBSIZE];
+-        tileData[tidx.local[0]] = r;
+-
+-        tidx.barrier.wait_with_tile_static_memory_fence();
+-
+-        for (auto h = TBSIZE / 2; h; h /= 2) {
+-            if (tidx.local[0] < h) {
+-                tileData[tidx.local[0]] += tileData[tidx.local[0] + h];
+-            }
+-            tidx.barrier.wait_with_tile_static_memory_fence();
+-        }
+-
+-        if (tidx.global == tidx.tile_origin) partial[tidx.tile] = tileData[0];
+-    });
+-
+-    try {
+-        partial.get_accelerator_view().wait();
+-    }
+-    catch (std::exception& e) {
+-        std::cerr << __FILE__ << ":" << __LINE__ << "\t  HCStream<T>::dot " << e.what() << std::endl;
+-        throw;
+-    }
+-
+-    std::vector<T> h_partial(n_tiles,0);
+-    hc::copy(partial,h_partial.begin());
+-
+-    T result = std::accumulate(h_partial.begin(), h_partial.end(), 0.);
+-
+-    return result;
+-
+-
+-}
+ 
+ template class HCStream<float>;
+ template class HCStream<double>;
+diff --git a/HCStream.h b/HCStream.h
+index 4bc2b18..58fb7a8 100644
+--- a/HCStream.h
++++ b/HCStream.h
+@@ -34,11 +34,7 @@ public:
+   ~HCStream();
+ 
+   virtual void copy() override;
+-  virtual void add() override;
+   virtual void mul() override;
+-  virtual void triad() override;
+-  virtual T dot() override;
+-  T dot_impl();
+ 
+   virtual void init_arrays(T initA, T initB, T initC) override;
+   virtual void read_arrays(std::vector<T>& a, std::vector<T>& b, std::vector<T>& c) override;
+diff --git a/Stream.h b/Stream.h
+index ff00a54..95dde68 100644
+--- a/Stream.h
++++ b/Stream.h
+@@ -27,9 +27,6 @@ class Stream
+     // These must be blocking calls
+     virtual void copy() = 0;
+     virtual void mul() = 0;
+-    virtual void add() = 0;
+-    virtual void triad() = 0;
+-    virtual T dot() = 0;
+ 
+     // Copy memory between host and device
+     virtual void init_arrays(T initA, T initB, T initC) = 0;
+diff --git a/main.cpp b/main.cpp
+index 5cd4ddc..0444c04 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -19,34 +19,17 @@
+ 
+ #include "Stream.h"
+ 
+-#if defined(CUDA)
+-#include "CUDAStream.h"
+-#elif defined(HIP)
++#if defined(HIP)
+ #include "HIPStream.h"
+ #elif defined(HC)
+ #include "HCStream.h"
+-#elif defined(OCL)
+-#include "OCLStream.h"
+-#elif defined(USE_RAJA)
+-#include "RAJAStream.hpp"
+-#elif defined(KOKKOS)
+-#include "KOKKOSStream.hpp"
+-#elif defined(ACC)
+-#include "ACCStream.h"
+-#elif defined(SYCL)
+-#include "SYCLStream.h"
+-#elif defined(OMP)
+-#include "OMPStream.h"
+ #endif
+-
+ // Default size of 2^25
+ unsigned int ARRAY_SIZE = 33554432;
+ unsigned int num_times = 100;
+ unsigned int deviceIndex = 0;
+ bool use_float = false;
+ 
+-template <typename T>
+-void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>& b, std::vector<T>& c, T& sum);
+ 
+ template <typename T>
+ void run();
+@@ -99,48 +82,18 @@ void run()
+ 
+   Stream<T> *stream;
+ 
+-#if defined(CUDA)
+-  // Use the CUDA implementation
+-  stream = new CUDAStream<T>(ARRAY_SIZE, deviceIndex);
+-
+-#elif defined(HIP)
++#if defined(HIP)
+   // Use the HIP implementation
+   stream = new HIPStream<T>(ARRAY_SIZE, deviceIndex);
+ 
+ #elif defined(HC)
+   // Use the HC implementation
+   stream = new HCStream<T>(ARRAY_SIZE, deviceIndex);
+-
+-#elif defined(OCL)
+-  // Use the OpenCL implementation
+-  stream = new OCLStream<T>(ARRAY_SIZE, deviceIndex);
+-
+-#elif defined(USE_RAJA)
+-  // Use the RAJA implementation
+-  stream = new RAJAStream<T>(ARRAY_SIZE, deviceIndex);
+-
+-#elif defined(KOKKOS)
+-  // Use the Kokkos implementation
+-  stream = new KOKKOSStream<T>(ARRAY_SIZE, deviceIndex);
+-
+-#elif defined(ACC)
+-  // Use the OpenACC implementation
+-  stream = new ACCStream<T>(ARRAY_SIZE, a.data(), b.data(), c.data(), deviceIndex);
+-
+-#elif defined(SYCL)
+-  // Use the SYCL implementation
+-  stream = new SYCLStream<T>(ARRAY_SIZE, deviceIndex);
+-
+-#elif defined(OMP)
+-  // Use the OpenMP implementation
+-  stream = new OMPStream<T>(ARRAY_SIZE, a.data(), b.data(), c.data(), deviceIndex);
+-
+ #endif
+-
+   stream->init_arrays(startA, startB, startC);
+ 
+   // List of times
+-  std::vector<std::vector<double>> timings(5);
++  std::vector<std::vector<double>> timings(2);
+ 
+   // Declare timers
+   std::chrono::high_resolution_clock::time_point t1, t2;
+@@ -160,29 +113,10 @@ void run()
+     t2 = std::chrono::high_resolution_clock::now();
+     timings[1].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
+ 
+-    // Execute Add
+-    t1 = std::chrono::high_resolution_clock::now();
+-    stream->add();
+-    t2 = std::chrono::high_resolution_clock::now();
+-    timings[2].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
+-
+-    // Execute Triad
+-    t1 = std::chrono::high_resolution_clock::now();
+-    stream->triad();
+-    t2 = std::chrono::high_resolution_clock::now();
+-    timings[3].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
+-
+-    // Execute Dot
+-    t1 = std::chrono::high_resolution_clock::now();
+-    sum = stream->dot();
+-    t2 = std::chrono::high_resolution_clock::now();
+-    timings[4].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
+-
+   }
+ 
+   // Check solutions
+   stream->read_arrays(a, b, c);
+-  check_solution<T>(num_times, a, b, c, sum);
+ 
+   // Display timing results
+   std::cout
+@@ -194,16 +128,13 @@ void run()
+ 
+   std::cout << std::fixed;
+ 
+-  std::string labels[5] = {"Copy", "Mul", "Add", "Triad", "Dot"};
+-  size_t sizes[5] = {
++  std::string labels[2] = {"Copy", "Mul"};
++  size_t sizes[2] = {
+     2 * sizeof(T) * ARRAY_SIZE,
+     2 * sizeof(T) * ARRAY_SIZE,
+-    3 * sizeof(T) * ARRAY_SIZE,
+-    3 * sizeof(T) * ARRAY_SIZE,
+-    2 * sizeof(T) * ARRAY_SIZE
+-  };
++   };
+ 
+-  for (int i = 0; i < 5; i++)
++  for (int i = 0; i < 2; i++)
+   {
+     // Get min/max; ignore the first result
+     auto minmax = std::minmax_element(timings[i].begin()+1, timings[i].end());
+@@ -226,62 +157,6 @@ void run()
+ 
+ }
+ 
+-template <typename T>
+-void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>& b, std::vector<T>& c, T& sum)
+-{
+-  // Generate correct solution
+-  T goldA = startA;
+-  T goldB = startB;
+-  T goldC = startC;
+-  T goldSum = 0.0;
+-
+-  const T scalar = startScalar;
+-
+-  for (unsigned int i = 0; i < ntimes; i++)
+-  {
+-    // Do STREAM!
+-    goldC = goldA;
+-    goldB = scalar * goldC;
+-    goldC = goldA + goldB;
+-    goldA = goldB + scalar * goldC;
+-  }
+-
+-  // Do the reduction
+-  goldSum = goldA * goldB * ARRAY_SIZE;
+-
+-  // Calculate the average error
+-  double errA = std::accumulate(a.begin(), a.end(), 0.0, [&](double sum, const T val){ return sum + fabs(val - goldA); });
+-  errA /= a.size();
+-  double errB = std::accumulate(b.begin(), b.end(), 0.0, [&](double sum, const T val){ return sum + fabs(val - goldB); });
+-  errB /= b.size();
+-  double errC = std::accumulate(c.begin(), c.end(), 0.0, [&](double sum, const T val){ return sum + fabs(val - goldC); });
+-  errC /= c.size();
+-  double errSum = fabs(sum - goldSum);
+-
+-  double epsi = std::numeric_limits<T>::epsilon() * 100.0;
+-
+-  if (errA > epsi)
+-    std::cerr
+-      << "Validation failed on a[]. Average error " << errA
+-      << std::endl;
+-  if (errB > epsi)
+-    std::cerr
+-      << "Validation failed on b[]. Average error " << errB
+-      << std::endl;
+-  if (errC > epsi)
+-    std::cerr
+-      << "Validation failed on c[]. Average error " << errC
+-      << std::endl;
+-  // Check sum to 8 decimal places
+-  if (errSum > 1.0E-8)
+-    std::cerr
+-      << "Validation failed on sum. Error " << errSum
+-      << std::endl << std::setprecision(15)
+-      << "Sum was " << sum << " but should be " << goldSum
+-      << std::endl;
+-
+-}
+-
+ int parseUInt(const char *str, unsigned int *output)
+ {
+   char *next;
