@@ -1,0 +1,170 @@
+diff --git a/HCStream.cpp b/HCStream.cpp
+index 1fa620b..131b6f0 100644
+--- a/HCStream.cpp
++++ b/HCStream.cpp
+@@ -77,30 +77,25 @@ HCStream<T>::~HCStream()
+ template <class T>
+ void HCStream<T>::init_arrays(T _a, T _b, T _c)
+ {
+-  hc::array_view<T,1> view_a(this->d_a);
+-  hc::array_view<T,1> view_b(this->d_b);
+-  hc::array_view<T,1> view_c(this->d_c);
++  T a[array_size];
++  T b[array_size];
++  T c[array_size];
++  for (int i = 0; i < array_size; i++) {
++    a[i] = _a;
++    b[i] = _b;
++    c[i] = _c;
++  }
++  hc::completion_future future_a= hc::copy_async(a, d_a);
++  hc::completion_future future_b= hc::copy_async(b, d_b);
++  hc::completion_future future_c= hc::copy_async(c, d_c);
+ 
+-  hc::completion_future future_a= hc::parallel_for_each(hc::extent<1>(array_size)
+-                                , [=](hc::index<1> i) [[hc]] {
+-                                  view_a[i] = _a;
+-                                });
+-
+-  hc::completion_future future_b= hc::parallel_for_each(hc::extent<1>(array_size)
+-                                                        , [=](hc::index<1> i) [[hc]] {
+-                                                          view_b[i] = _b;
+-                                                        });
+-  hc::completion_future future_c= hc::parallel_for_each(hc::extent<1>(array_size)
+-                                                        , [=](hc::index<1> i) [[hc]] {
+-                                                          view_c[i] = _c;
+-                                                        });
+   try{
+     future_a.wait();
+     future_b.wait();
+     future_c.wait();
+   }
+   catch(std::exception& e){
+-    std::cerr << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::init_arrays " << e.what() << std::endl;
++    std::cout << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::init_arrays " << e.what() << std::endl;
+     throw;
+   }
+ 
+@@ -119,18 +114,16 @@ template <class T>
+ void HCStream<T>::copy()
+ {
+ 
+-  hc::array_view<T,1> view_a = this->d_a;
+-  hc::array_view<T,1> view_c = this->d_c;
+ 
+   try{
+     hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
+                                 , [=](hc::index<1> index) [[hc]] {
+-                                  view_c[index] = view_a[index];
++                                  this->d_c[index] = this->d_a[index];
+ 								});
+     future_kernel.wait();
+   }
+   catch(std::exception& e){
+-    std::cerr << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::copy " << e.what() << std::endl;
++    std::cout << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::copy " << e.what() << std::endl;
+     throw;
+   }
+ }
+@@ -140,18 +133,16 @@ void HCStream<T>::mul()
+ {
+ 
+   const T scalar = startScalar;
+-  hc::array_view<T,1> view_b = this->d_b;
+-  hc::array_view<T,1> view_c = this->d_c;
+ 
+   try{
+     hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
+                                 , [=](hc::index<1> i) [[hc]] {
+-                                  view_b[i] = scalar*view_c[i];
++                                  this->d_b[i] = scalar*this->d_c[i];
+ 								});
+     future_kernel.wait();
+   }
+   catch(std::exception& e){
+-    std::cerr << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::mul " << e.what() << std::endl;
++    std::cout << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::mul " << e.what() << std::endl;
+     throw;
+   }
+ }
+@@ -161,19 +152,19 @@ void HCStream<T>::add()
+ {
+ 
+ 
+-  hc::array_view<T,1> view_a(this->d_a);
+-  hc::array_view<T,1> view_b(this->d_b);
+-  hc::array_view<T,1> view_c(this->d_c);
++  //hc::array_view<T,1> view_a(this->d_a);
++  //hc::array_view<T,1> view_b(this->d_b);
++  //hc::array_view<T,1> view_c(this->d_c);
+ 
+   try{
+     hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
+                                 , [=](hc::index<1> i) [[hc]] {
+-                                  view_c[i] = view_a[i]+view_b[i];
++                                  d_c[i] = d_a[i]+d_b[i];
+ 								});
+     future_kernel.wait();
+   }
+   catch(std::exception& e){
+-    std::cerr << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::add " << e.what() << std::endl;
++    std::cout << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::add " << e.what() << std::endl;
+     throw;
+   }
+ }
+@@ -183,19 +174,19 @@ void HCStream<T>::triad()
+ {
+ 
+   const T scalar = startScalar;
+-  hc::array_view<T,1> view_a(this->d_a);
+-  hc::array_view<T,1> view_b(this->d_b);
+-  hc::array_view<T,1> view_c(this->d_c);
++  //hc::array_view<T,1> view_a(this->d_a);
++  //hc::array_view<T,1> view_b(this->d_b);
++  //hc::array_view<T,1> view_c(this->d_c);
+ 
+   try{
+     hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
+                                 , [=](hc::index<1> i) [[hc]] {
+-                                  view_a[i] = view_b[i] + scalar*view_c[i];
++                                  d_a[i] = d_b[i] + scalar*d_c[i];
+ 								});
+     future_kernel.wait();
+   }
+   catch(std::exception& e){
+-    std::cerr << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::triad " << e.what() << std::endl;
++    std::cout << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::triad " << e.what() << std::endl;
+     throw;
+   }
+ }
+@@ -228,7 +219,7 @@ T HCStream<T>::dot()
+                             auto gidx = tidx.global[0];
+         T r = T{0}; // Assumes reduction op is addition.
+         while (gidx < view_a.get_extent().size()) {
+-            r += view_a[gidx] * view_b[gidx];
++            r += d_a[gidx] * d_b[gidx];
+             gidx += domain_sz;
+         }
+ 
+@@ -251,7 +242,7 @@ T HCStream<T>::dot()
+         partial.get_accelerator_view().wait();
+     }
+     catch (std::exception& e) {
+-        std::cerr << __FILE__ << ":" << __LINE__ << "\t  HCStream<T>::dot " << e.what() << std::endl;
++        std::cout << __FILE__ << ":" << __LINE__ << "\t  HCStream<T>::dot " << e.what() << std::endl;
+         throw;
+     }
+ 
+diff --git a/main.cpp b/main.cpp
+index 5cd4ddc..77e74a1 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -182,7 +182,7 @@ void run()
+ 
+   // Check solutions
+   stream->read_arrays(a, b, c);
+-  check_solution<T>(num_times, a, b, c, sum);
++  //check_solution<T>(num_times, a, b, c, sum);
+ 
+   // Display timing results
+   std::cout
