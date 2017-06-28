@@ -9,6 +9,8 @@
 #include <vector>
 #include <locale>
 #include <numeric>
+#include <hc_am.hpp>
+#include <hc.hpp>
 
 #define TBSIZE 1024
 
@@ -44,10 +46,7 @@ void listDevices(void)
 
 template <class T>
 HCStream<T>::HCStream(const unsigned int ARRAY_SIZE, const int device_index):
-  array_size(ARRAY_SIZE),
-  d_a(ARRAY_SIZE),
-  d_b(ARRAY_SIZE),
-  d_c(ARRAY_SIZE)
+  array_size(ARRAY_SIZE)
 {
 
   // The array size must be divisible by TBSIZE for kernel launches
@@ -65,6 +64,10 @@ HCStream<T>::HCStream(const unsigned int ARRAY_SIZE, const int device_index):
   hc::accelerator::set_default(current.get_device_path());
 
   std::cout << "Using HC device " << getDeviceName(current) << std::endl;
+  auto acc = hc::accelerator();
+  this->d_a = (T*) hc::am_alloc(array_size * sizeof(T), acc, 0);
+  this->d_b = (T*) hc::am_alloc(array_size * sizeof(T), acc, 0);
+  this->d_c = (T*) hc::am_alloc(array_size * sizeof(T), acc, 0);
 
 }
 
@@ -72,24 +75,36 @@ HCStream<T>::HCStream(const unsigned int ARRAY_SIZE, const int device_index):
 template <class T>
 HCStream<T>::~HCStream()
 {
+  hc::am_free(d_a);
+  hc::am_free(d_b);
+  hc::am_free(d_c);
 }
 
 template <class T>
 void HCStream<T>::init_arrays(T _a, T _b, T _c)
 {
-  T a[array_size];
-  T b[array_size];
-  T c[array_size];
+  T* a = (T*) malloc(array_size * sizeof(T));
+  T* b = (T*) malloc(array_size * sizeof(T));
+  T* c = (T*) malloc(array_size * sizeof(T));
   for (int i = 0; i < array_size; i++) {
     a[i] = _a;
     b[i] = _b;
     c[i] = _c;
   }
-  hc::completion_future future_a= hc::copy_async(a, d_a);
-  hc::completion_future future_b= hc::copy_async(b, d_b);
-  hc::completion_future future_c= hc::copy_async(c, d_c);
+  auto acc = hc::accelerator();
+  hc::accelerator_view av = acc.get_default_view();
+  av.copy(a, d_a, array_size*sizeof(T));
+  av.copy(b, d_b, array_size*sizeof(T));
+  av.copy(c, d_c, array_size*sizeof(T));
 
-  try{
+  //hc::completion_future future_a= hc::copy_async(a, d_a);
+  //hc::completion_future future_b= hc::copy_async(b, d_b);
+  //hc::completion_future future_c= hc::copy_async(c, d_c);
+
+  free(a);
+  free(b);
+  free(c);
+/*  try{
     future_a.wait();
     future_b.wait();
     future_c.wait();
@@ -97,16 +112,16 @@ void HCStream<T>::init_arrays(T _a, T _b, T _c)
   catch(std::exception& e){
     std::cout << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::init_arrays " << e.what() << std::endl;
     throw;
-  }
+  }*/
 
 }
 
 template <class T>
 void HCStream<T>::read_arrays(std::vector<T>& a, std::vector<T>& b, std::vector<T>& c)
 {
-  hc::copy(d_a,a.begin());
-  hc::copy(d_b,b.begin());
-  hc::copy(d_c,c.begin());
+  //hc::copy(d_a,a.begin());
+  //hc::copy(d_b,b.begin());
+  //hc::copy(d_c,c.begin());
 }
 
 
@@ -118,7 +133,7 @@ void HCStream<T>::copy()
   try{
     hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
                                 , [=](hc::index<1> index) [[hc]] {
-                                  this->d_c[index] = this->d_a[index];
+                                  this->d_c[index[0]] = this->d_a[index[0]];
 								});
     future_kernel.wait();
   }
@@ -137,7 +152,7 @@ void HCStream<T>::mul()
   try{
     hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
                                 , [=](hc::index<1> i) [[hc]] {
-                                  this->d_b[i] = scalar*this->d_c[i];
+                                  this->d_b[i[0]] = scalar*this->d_c[i[0]];
 								});
     future_kernel.wait();
   }
@@ -159,7 +174,7 @@ void HCStream<T>::add()
   try{
     hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
                                 , [=](hc::index<1> i) [[hc]] {
-                                  d_c[i] = d_a[i]+d_b[i];
+                                  d_c[i[0]] = d_a[i[0]]+d_b[i[0]];
 								});
     future_kernel.wait();
   }
@@ -181,7 +196,7 @@ void HCStream<T>::triad()
   try{
     hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
                                 , [=](hc::index<1> i) [[hc]] {
-                                  d_a[i] = d_b[i] + scalar*d_c[i];
+                                  d_a[i[0]] = d_b[i[0]] + scalar*d_c[i[0]];
 								});
     future_kernel.wait();
   }
@@ -199,7 +214,7 @@ T HCStream<T>::dot()
     // ->Samples/CaseStudies/Reduction
     // ->CascadingReduction.h
 
-    static constexpr std::size_t n_tiles = 64;
+    /*static constexpr std::size_t n_tiles = 64;
 
     const auto& view_a = this->d_a;
     const auto& view_b = this->d_b;
@@ -252,7 +267,7 @@ T HCStream<T>::dot()
     T result = std::accumulate(h_partial.begin(), h_partial.end(), 0.);
 
     return result;
-
+*/  return T(0);
 
 }
 

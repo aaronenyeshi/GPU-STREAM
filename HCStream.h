@@ -23,9 +23,9 @@ protected:
   // Size of arrays
   unsigned int array_size;
   // Device side pointers to arrays
-  hc::array<T,1> d_a;
-  hc::array<T,1> d_b;
-  hc::array<T,1> d_c;
+  T* d_a;
+  T* d_b;
+  T* d_c;
 
 
 public:

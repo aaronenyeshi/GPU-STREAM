@@ -136,7 +136,7 @@ void run()
   stream = new OMPStream<T>(ARRAY_SIZE, a.data(), b.data(), c.data(), deviceIndex);
 
 #endif
-
+  std::cout << "Entering init arrays" <<std::endl;
   stream->init_arrays(startA, startB, startC);
 
   // List of times
@@ -144,7 +144,7 @@ void run()
 
   // Declare timers
   std::chrono::high_resolution_clock::time_point t1, t2;
-
+  std::cout << "Entering Main Loop" <<std::endl;
   // Main loop
   for (unsigned int k = 0; k < num_times; k++)
   {
@@ -153,13 +153,12 @@ void run()
     stream->copy();
     t2 = std::chrono::high_resolution_clock::now();
     timings[0].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
-
+    std::cout << "Entering Mul" <<std::endl;
     // Execute Mul
     t1 = std::chrono::high_resolution_clock::now();
     stream->mul();
     t2 = std::chrono::high_resolution_clock::now();
     timings[1].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
-
     // Execute Add
     t1 = std::chrono::high_resolution_clock::now();
     stream->add();
@@ -181,7 +180,7 @@ void run()
   }
 
   // Check solutions
-  stream->read_arrays(a, b, c);
+  //stream->read_arrays(a, b, c);
   //check_solution<T>(num_times, a, b, c, sum);
 
   // Display timing results
