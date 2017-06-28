@@ -182,7 +182,7 @@ void run()
 
   // Check solutions
   stream->read_arrays(a, b, c);
-  check_solution<T>(num_times, a, b, c, sum);
+  //check_solution<T>(num_times, a, b, c, sum);
 
   // Display timing results
   std::cout
