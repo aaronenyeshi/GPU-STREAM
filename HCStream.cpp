@@ -65,9 +65,9 @@ HCStream<T>::HCStream(const unsigned int ARRAY_SIZE, const int device_index):
 
   std::cout << "Using HC device " << getDeviceName(current) << std::endl;
   auto acc = hc::accelerator();
-  this->d_a = (T*) hc::am_alloc(array_size * sizeof(T), acc, 0);
-  this->d_b = (T*) hc::am_alloc(array_size * sizeof(T), acc, 0);
-  this->d_c = (T*) hc::am_alloc(array_size * sizeof(T), acc, 0);
+  d_a = (T*) hc::am_alloc(array_size * sizeof(T), acc, 0);
+  d_b = (T*) hc::am_alloc(array_size * sizeof(T), acc, 0);
+  d_c = (T*) hc::am_alloc(array_size * sizeof(T), acc, 0);
 
 }
 
@@ -133,7 +133,7 @@ void HCStream<T>::copy()
   try{
     hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
                                 , [=](hc::index<1> index) [[hc]] {
-                                  this->d_c[index[0]] = this->d_a[index[0]];
+                                  d_c[index[0]] = d_a[index[0]];
 								});
     future_kernel.wait();
   }
@@ -152,7 +152,7 @@ void HCStream<T>::mul()
   try{
     hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
                                 , [=](hc::index<1> i) [[hc]] {
-                                  this->d_b[i[0]] = scalar*this->d_c[i[0]];
+                                  d_b[i[0]] = scalar*d_c[i[0]];
 								});
     future_kernel.wait();
   }
