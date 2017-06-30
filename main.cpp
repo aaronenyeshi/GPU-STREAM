@@ -148,29 +148,31 @@ void run()
   // Main loop
   for (unsigned int k = 0; k < num_times; k++)
   {
+    //std::cout << "Entering Copy" <<std::endl;
     // Execute Copy
     t1 = std::chrono::high_resolution_clock::now();
     stream->copy();
     t2 = std::chrono::high_resolution_clock::now();
     timings[0].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
-    std::cout << "Entering Mul" <<std::endl;
+    //std::cout << "Entering Mul" <<std::endl;
     // Execute Mul
     t1 = std::chrono::high_resolution_clock::now();
     stream->mul();
     t2 = std::chrono::high_resolution_clock::now();
     timings[1].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
+    //std::cout << "Entering Add" <<std::endl;
     // Execute Add
     t1 = std::chrono::high_resolution_clock::now();
     stream->add();
     t2 = std::chrono::high_resolution_clock::now();
     timings[2].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
-
+    //std::cout << "Entering Triad" <<std::endl;
     // Execute Triad
     t1 = std::chrono::high_resolution_clock::now();
     stream->triad();
     t2 = std::chrono::high_resolution_clock::now();
     timings[3].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
-
+    //std::cout << "Entering Dot" <<std::endl;
     // Execute Dot
     t1 = std::chrono::high_resolution_clock::now();
     sum = stream->dot();
@@ -212,11 +214,11 @@ void run()
 
     // Display results
     std::cout
-      << std::left << std::setw(12) << labels[i]
-      << std::left << std::setw(12) << std::setprecision(3) << 1.0E-6 * sizes[i] / (*minmax.first)
-      << std::left << std::setw(12) << std::setprecision(5) << *minmax.first
-      << std::left << std::setw(12) << std::setprecision(5) << *minmax.second
-      << std::left << std::setw(12) << std::setprecision(5) << average
+      << std::left << std::setw(16) << labels[i]
+      << std::left << std::setw(16) << std::setprecision(3) << 1.0E-6 * sizes[i] / (*minmax.first)
+      << std::left << std::setw(16) << std::setprecision(5) << *minmax.first
+      << std::left << std::setw(16) << std::setprecision(5) << *minmax.second
+      << std::left << std::setw(16) << std::setprecision(5) << average
       << std::endl;
 
   }

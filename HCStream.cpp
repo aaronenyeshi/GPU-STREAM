@@ -129,13 +129,23 @@ template <class T>
 void HCStream<T>::copy()
 {
 
-
+  hc::extent<1> e(array_size);
   try{
-    hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
-                                , [=](hc::index<1> index) [[hc]] {
-                                  d_c[index[0]] = d_a[index[0]];
-								});
-    future_kernel.wait();
+    //hc::completion_future future_kernel =
+    hc::parallel_for_each(
+      e,
+      [=](hc::index<1> index) [[hc]] {
+
+        d_c[index[0]] = d_a[index[0]];
+    });
+
+    // create a barrier packet
+   // hc::accelerator_view av = hc::accelerator().get_default_view();
+    //hc::completion_future fut = av.create_marker();
+    // wait on the barrier packet
+    //fut.wait();
+
+    //future_kernel.wait();
   }
   catch(std::exception& e){
     std::cout << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::copy " << e.what() << std::endl;
@@ -148,13 +158,23 @@ void HCStream<T>::mul()
 {
 
   const T scalar = startScalar;
+  hc::extent<1> e(array_size);
 
   try{
-    hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
-                                , [=](hc::index<1> i) [[hc]] {
-                                  d_b[i[0]] = scalar*d_c[i[0]];
-								});
-    future_kernel.wait();
+    //hc::completion_future future_kernel =
+    hc::parallel_for_each(
+      e,
+      [=](hc::index<1> i) [[hc]] {
+        d_b[i[0]] = scalar*d_c[i[0]];
+    });
+
+    // create a barrier packet
+    //hc::accelerator_view av = hc::accelerator().get_default_view();
+    //hc::completion_future fut = av.create_marker();
+    // wait on the barrier packet
+    //fut.wait();
+
+    //future_kernel.wait();
   }
   catch(std::exception& e){
     std::cout << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::mul " << e.what() << std::endl;
@@ -170,13 +190,23 @@ void HCStream<T>::add()
   //hc::array_view<T,1> view_a(this->d_a);
   //hc::array_view<T,1> view_b(this->d_b);
   //hc::array_view<T,1> view_c(this->d_c);
+  hc::extent<1> e(array_size);
 
   try{
-    hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
-                                , [=](hc::index<1> i) [[hc]] {
-                                  d_c[i[0]] = d_a[i[0]]+d_b[i[0]];
-								});
-    future_kernel.wait();
+    //hc::completion_future future_kernel =
+    hc::parallel_for_each(
+      e,
+      [=](hc::index<1> i) [[hc]] {
+        d_c[i[0]] = d_a[i[0]]+d_b[i[0]];
+    });
+
+    // create a barrier packet
+    //hc::accelerator_view av = hc::accelerator().get_default_view();
+    //hc::completion_future fut = av.create_marker();
+    // wait on the barrier packet
+    //fut.wait();
+
+    //future_kernel.wait();
   }
   catch(std::exception& e){
     std::cout << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::add " << e.what() << std::endl;
@@ -188,17 +218,29 @@ template <class T>
 void HCStream<T>::triad()
 {
 
-  const T scalar = startScalar;
+  T scalar = startScalar;
   //hc::array_view<T,1> view_a(this->d_a);
   //hc::array_view<T,1> view_b(this->d_b);
   //hc::array_view<T,1> view_c(this->d_c);
+  hc::extent<1> e(array_size);
 
   try{
-    hc::completion_future future_kernel = hc::parallel_for_each(hc::extent<1>(array_size)
-                                , [=](hc::index<1> i) [[hc]] {
-                                  d_a[i[0]] = d_b[i[0]] + scalar*d_c[i[0]];
-								});
-    future_kernel.wait();
+    //hc::completion_future future_kernel =
+    hc::parallel_for_each(
+      e,
+      [=](hc::index<1> i) [[hc]] {
+        d_a[i[0]] = d_b[i[0]] + scalar*d_c[i[0]];
+    });
+
+    // create a barrier packet
+    //hc::accelerator_view av = hc::accelerator().get_default_view();
+    //hc::completion_future fut = av.create_marker();
+    // wait on the barrier packet
+    //fut.wait();
+
+
+
+    //future_kernel.wait();
   }
   catch(std::exception& e){
     std::cout << __FILE__ << ":" << __LINE__ << "\t HCStream<T>::triad " << e.what() << std::endl;
@@ -216,8 +258,8 @@ T HCStream<T>::dot()
 
     /*static constexpr std::size_t n_tiles = 64;
 
-    const auto& view_a = this->d_a;
-    const auto& view_b = this->d_b;
+    const auto& view_a = d_a;
+    const auto& view_b = d_b;
 
     auto ex = view_a.get_extent();
     const auto tiled_ex = hc::extent<1>(n_tiles * TBSIZE).tile(TBSIZE);
@@ -266,8 +308,7 @@ T HCStream<T>::dot()
 
     T result = std::accumulate(h_partial.begin(), h_partial.end(), 0.);
 
-    return result;
-*/  return T(0);
+    return result;*/return T(0);
 
 }
 
