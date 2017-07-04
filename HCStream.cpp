@@ -128,7 +128,8 @@ void HCStream<T>::read_arrays(std::vector<T>& a, std::vector<T>& b, std::vector<
 template <class T>
 void HCStream<T>::copy()
 {
-
+  T* d_cc = d_c;
+  T* d_aa = d_a;
   hc::extent<1> e(array_size);
   try{
     //hc::completion_future future_kernel =
@@ -136,7 +137,7 @@ void HCStream<T>::copy()
       e,
       [=](hc::index<1> index) [[hc]] {
 
-        d_c[index[0]] = d_a[index[0]];
+        d_cc[index[0]] = d_aa[index[0]];
     });
 
     // create a barrier packet
@@ -156,7 +157,8 @@ void HCStream<T>::copy()
 template <class T>
 void HCStream<T>::mul()
 {
-
+  T* d_bb = d_b;
+  T* d_cc = d_c;
   const T scalar = startScalar;
   hc::extent<1> e(array_size);
 
@@ -165,7 +167,7 @@ void HCStream<T>::mul()
     hc::parallel_for_each(
       e,
       [=](hc::index<1> i) [[hc]] {
-        d_b[i[0]] = scalar*d_c[i[0]];
+        d_bb[i[0]] = scalar*d_cc[i[0]];
     });
 
     // create a barrier packet
@@ -191,13 +193,16 @@ void HCStream<T>::add()
   //hc::array_view<T,1> view_b(this->d_b);
   //hc::array_view<T,1> view_c(this->d_c);
   hc::extent<1> e(array_size);
+  T* d_cc = d_c;
+  T* d_aa = d_a;
+  T* d_bb = d_b;
 
   try{
     //hc::completion_future future_kernel =
     hc::parallel_for_each(
       e,
       [=](hc::index<1> i) [[hc]] {
-        d_c[i[0]] = d_a[i[0]]+d_b[i[0]];
+        d_cc[i[0]] = d_aa[i[0]]+d_bb[i[0]];
     });
 
     // create a barrier packet
@@ -223,13 +228,16 @@ void HCStream<T>::triad()
   //hc::array_view<T,1> view_b(this->d_b);
   //hc::array_view<T,1> view_c(this->d_c);
   hc::extent<1> e(array_size);
+  T* d_aa = d_a;
+  T* d_bb = d_b;
+  T* d_cc = d_c;
 
   try{
     //hc::completion_future future_kernel =
     hc::parallel_for_each(
       e,
       [=](hc::index<1> i) [[hc]] {
-        d_a[i[0]] = d_b[i[0]] + scalar*d_c[i[0]];
+        d_aa[i[0]] = d_bb[i[0]] + scalar*d_cc[i[0]];
     });
 
     // create a barrier packet
