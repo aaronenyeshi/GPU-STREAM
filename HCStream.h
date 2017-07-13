@@ -11,20 +11,22 @@
 #include <stdexcept>
 #include <sstream>
 
-#include "Stream.h"
+//#include "Stream.h"
 #include "hc.hpp"
 
 #define IMPLEMENTATION_STRING "HC"
 
+#define startA (0.1)
+#define startC (0.2)
+
 template <class T>
-class HCStream : public Stream<T>
+class HCStream //: public Stream<T>
 {
 protected:
   // Size of arrays
   unsigned int array_size;
   // Device side pointers to arrays
   T* d_a;
-  T* d_b;
   T* d_c;
 
 
@@ -34,13 +36,10 @@ public:
   ~HCStream();
 
   virtual void copy() override;
-  virtual void add() override;
-  virtual void mul() override;
-  virtual void triad() override;
-  virtual T dot() override;
-  T dot_impl();
-
-  virtual void init_arrays(T initA, T initB, T initC) override;
-  virtual void read_arrays(std::vector<T>& a, std::vector<T>& b, std::vector<T>& c) override;
+  virtual void init_arrays(T initA, T initC) override;
 
 };
+
+void listDevices(void);
+std::string getDeviceName(const int);
+std::string getDeviceDriver(const int);
