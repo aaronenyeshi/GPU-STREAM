@@ -39,7 +39,3 @@ public:
   virtual void init_arrays(T initA, T initC) override;
 
 };
-
-void listDevices(void);
-std::string getDeviceName(const int);
-std::string getDeviceDriver(const int);

@@ -13,36 +13,6 @@
 
 #define TBSIZE 1024
 
-std::string getDeviceName(const hc::accelerator& _acc)
-{
-  std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
-  std::string value = converter.to_bytes(_acc.get_description());
-  return value;
-}
-
-void listDevices(void)
-{
-  // Get number of devices
-  std::vector<hc::accelerator> accs = hc::accelerator::get_all();
-
-  // Print device names
-  if (accs.empty())
-  {
-    std::cerr << "No devices found." << std::endl;
-  }
-  else
-  {
-    std::cout << std::endl;
-    std::cout << "Devices:" << std::endl;
-    for (int i = 0; i < accs.size(); i++)
-    {
-      std::cout << i << ": " << getDeviceName(accs[i]) << std::endl;
-    }
-    std::cout << std::endl;
-  }
-}
-
-
 template <class T>
 HCStream<T>::HCStream(const unsigned int ARRAY_SIZE, const int device_index):
   array_size(ARRAY_SIZE)
@@ -61,8 +31,10 @@ HCStream<T>::HCStream(const unsigned int ARRAY_SIZE, const int device_index):
   auto current = accs.at(device_index);
 
   hc::accelerator::set_default(current.get_device_path());
+  std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+  std::string value = converter.to_bytes(current.get_description());
 
-  std::cout << "Using HC device " << getDeviceName(current) << std::endl;
+  std::cout << "Using HC device " << value << std::endl;
   auto acc = hc::accelerator();
   d_a = (T*) hc::am_alloc(array_size * sizeof(T), acc, 0);
   d_c = (T*) hc::am_alloc(array_size * sizeof(T), acc, 0);
