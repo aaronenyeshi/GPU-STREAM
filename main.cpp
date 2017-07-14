@@ -34,9 +34,9 @@ void parseArguments(int argc, char *argv[]);
 int main(int argc, char *argv[])
 {
   std::cout
-    << "GPU-STREAM" << std::endl
-    << "Version: " << VERSION_STRING << std::endl
-    << "Implementation: " << IMPLEMENTATION_STRING << std::endl;
+    << "GPU-STREAM "
+    << "Version: " << VERSION_STRING
+    << " Implementation: " << IMPLEMENTATION_STRING << std::endl;
 
   parseArguments(argc, argv);
 
@@ -98,11 +98,11 @@ void run()
 
   // Display timing results
   std::cout
-    << std::left << std::setw(12) << "Function"
-    << std::left << std::setw(12) << "MBytes/sec"
-    << std::left << std::setw(12) << "Min (sec)"
-    << std::left << std::setw(12) << "Max"
-    << std::left << std::setw(12) << "Average" << std::endl;
+    << std::left << std::setw(16) << "Function"
+    << std::left << std::setw(16) << "MBytes/sec"
+    << std::left << std::setw(16) << "Min (sec)"
+    << std::left << std::setw(16) << "Max"
+    << std::left << std::setw(16) << "Average" << std::endl;
 
   std::cout << std::fixed;
 

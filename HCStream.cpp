@@ -6,9 +6,8 @@
 #include "HCStream.h"
 
 #include <codecvt>
-#include <vector>
 #include <locale>
-#include <numeric>
+#include <vector>
 #include <hc_am.hpp>
 #include <hc.hpp>
 
