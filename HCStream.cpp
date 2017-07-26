@@ -84,5 +84,14 @@ void HCStream<T>::copy()
   }
 }
 
+template <class T>
+double HCStream<T>::error()
+{
+  double error = 0;
+  for (int i=0; i<array_size; i++){
+     error += std::abs(d_c[i] - 0.2);
+  }
+  return error;
+}
+
 template class HCStream<float>;
-template class HCStream<double>;

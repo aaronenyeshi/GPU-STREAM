@@ -37,5 +37,5 @@ public:
 
   virtual void copy() override;
   virtual void init_arrays(T initA, T initC) override;
-
+  virtual double error() override;
 };

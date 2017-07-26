@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     << " Implementation: " << IMPLEMENTATION_STRING << std::endl;
 
   parseArguments(argc, argv);
-  run<double>();
+  run<float>();
 
 }
 
@@ -95,6 +95,8 @@ void run()
     << std::left << std::setw(16) << std::setprecision(5) << average
     << std::endl;
 
+  double error = stream->error();
+  std::cout << "Error calculated: " << error << std::endl;
   delete stream;
 
 }
